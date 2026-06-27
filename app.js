@@ -127,7 +127,18 @@ LP.data = {
     { type: 'login', text: 'Agency Owner logged in', ts: new Date().toISOString() },
     { type: 'settings', text: 'CAPI tracking enabled for Prestige Builders', ts: new Date(Date.now() - 3600000).toISOString() },
     { type: 'export', text: 'Exported leads for Sri Balaji Hospitals', ts: new Date(Date.now() - 7200000).toISOString() }
+  ],
+  agents: [
+    { id: 'ag1', name: 'Ravi Sales', avatar: 'https://i.pravatar.cc/150?u=ag1' },
+    { id: 'ag2', name: 'Sneha Support', avatar: 'https://i.pravatar.cc/150?u=ag2' }
   ]
+};
+
+// Polyfill LP.stream so legacy page components don't crash when calling .on()
+LP.stream = {
+  on: (cb) => {
+    return () => {}; // return dummy unsubscribe function
+  }
 };
 
 // Initialize global data
