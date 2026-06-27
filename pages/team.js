@@ -143,6 +143,9 @@ LP.pages.team = (() => {
           <h1 class="page-title">Team Management</h1>
           <div class="page-subtitle">Assign leads to agents and track their activities</div>
         </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <button class="btn btn-primary btn-sm" id="add-agent-btn">+ Add New Agent</button>
+        </div>
       </div>
       <div style="display:flex;gap:24px;align-items:flex-start">
         <div style="width:280px;flex-shrink:0">
@@ -178,6 +181,75 @@ LP.pages.team = (() => {
         const lead = LP.data.leads.find(l => l.id === row.dataset.leadId);
         if (lead) LP.drawer.open(lead);
       });
+    });
+
+    // Add Agent Button
+    document.getElementById('add-agent-btn')?.addEventListener('click', () => {
+      showAddAgentModal(container);
+    });
+  }
+
+  function showAddAgentModal(container) {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="modal-content" style="max-width:400px">
+        <h2 style="margin-top:0">Add New Agent</h2>
+        
+        <label class="form-label">Name</label>
+        <input type="text" id="new-agent-name" class="form-input" placeholder="e.g. Rahul Sharma" style="margin-bottom:12px">
+        
+        <label class="form-label">Role</label>
+        <select id="new-agent-role" class="form-select" style="margin-bottom:12px">
+          <option value="Sales Rep">Sales Rep</option>
+          <option value="Support Agent">Support Agent</option>
+          <option value="Account Manager">Account Manager</option>
+        </select>
+
+        <label class="form-label">Color (for avatar)</label>
+        <input type="color" id="new-agent-color" class="form-input" value="#3b82f6" style="margin-bottom:20px;padding:4px;height:40px">
+
+        <div style="display:flex;gap:10px;justify-content:flex-end">
+          <button class="btn btn-ghost" id="agent-cancel-btn">Cancel</button>
+          <button class="btn btn-primary" id="agent-save-btn">Save Agent</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    // Make it visible
+    requestAnimationFrame(() => overlay.classList.add('open'));
+
+    const close = () => {
+      overlay.classList.remove('open');
+      setTimeout(() => overlay.remove(), 250);
+    };
+
+    overlay.querySelector('#agent-cancel-btn').addEventListener('click', close);
+
+    overlay.querySelector('#agent-save-btn').addEventListener('click', () => {
+      const name = document.getElementById('new-agent-name').value.trim();
+      const role = document.getElementById('new-agent-role').value;
+      const color = document.getElementById('new-agent-color').value;
+
+      if (!name) return LP.toast.warning('Name required', 'Please enter a name for the agent');
+
+      const id = 'ag_' + Date.now();
+      const initials = name.split(' ').map(w => w[0]).join('').substring(0,2).toUpperCase();
+      
+      LP.data.agents.push({
+        id,
+        name,
+        role,
+        initials,
+        color,
+        avatar: \`https://i.pravatar.cc/150?u=\${id}\`
+      });
+
+      LP.toast.success('Agent Added', \`\${name} has been added to the team\`);
+      close();
+      init(container); // Re-render the page to show new agent
     });
   }
 
