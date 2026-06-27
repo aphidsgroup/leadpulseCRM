@@ -229,33 +229,50 @@ LP.drawer = (() => {
 
     // Status change
     document.querySelectorAll('#status-opts .status-opt').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         const newStatus = btn.dataset.status;
+        const oldStatus = lead.status;
+        
+        // Optimistic UI update
         lead.status = newStatus;
-
-        // Update button styles
         document.querySelectorAll('#status-opts .status-opt').forEach(b => {
           b.className = `status-opt${b.dataset.status === newStatus ? ` active-${newStatus}` : ''}`;
         });
 
-        // Add activity
-        const activity = {
-          type: 'status_change',
-          text: `Status changed to <strong>${newStatus}</strong>`,
-          user: 'Agency Owner',
-          ts: new Date().toISOString(),
-        };
-        lead.activities.unshift(activity);
-        document.getElementById('activity-log').innerHTML = renderActivities(lead.activities);
+        try {
+          await LP.api.updateLead(lead.id, { status: newStatus });
+          await LP.api.addActivity({ lead_id: lead.id, type: 'status_change', text: `Status changed to <strong>${newStatus}</strong>` });
+          
+          // Refresh data
+          LP.data.leads = await LP.api.getLeads();
+          const updatedLead = LP.data.leads.find(l => l.id === lead.id);
+          if (updatedLead) {
+            document.getElementById('activity-log').innerHTML = renderActivities(updatedLead.activities);
+            lead.activities = updatedLead.activities;
+          }
+          
+          // Update badge on sidebar
+          LP.sidebar.updateBadge();
 
-        // Update badge on sidebar
-        LP.sidebar.updateBadge();
+          LP.toast.success(`Status updated to ${newStatus}`, lead.name);
 
-        LP.toast.success(`Status updated to ${newStatus}`, lead.name);
-
-        // If qualified, ask CAPI push
-        if (newStatus === 'qualified' || newStatus === 'won') {
-          setTimeout(() => LP.toast.info('Push to Meta CAPI?', 'Click CAPI button to optimize ad delivery'), 1000);
+          // If qualified, ask CAPI push
+          if (newStatus === 'qualified' || newStatus === 'won') {
+            setTimeout(() => LP.toast.info('Push to Meta CAPI?', 'Click CAPI button to optimize ad delivery'), 1000);
+          }
+          
+          // Refresh underlying page
+          const mod = LP.router.pageMap[LP.router.current];
+          if (mod && mod.init) {
+            mod.init(document.getElementById('page-content'));
+          }
+        } catch (err) {
+          LP.toast.warning('Error', 'Failed to update status');
+          // Revert optimistic update
+          lead.status = oldStatus;
+          document.querySelectorAll('#status-opts .status-opt').forEach(b => {
+            b.className = `status-opt${b.dataset.status === oldStatus ? ` active-${oldStatus}` : ''}`;
+          });
         }
       });
     });
@@ -291,23 +308,81 @@ LP.drawer = (() => {
     });
 
     // Assign
-    document.getElementById('assign-btn')?.addEventListener('click', () => {
+    document.getElementById('assign-btn')?.addEventListener('click', async () => {
+      const btn = document.getElementById('assign-btn');
       const sel = document.getElementById('assign-select');
       const agentId = sel.value;
       const agent = LP.data.agents.find(a => a.id === agentId);
-      lead.assignedTo = agent || null;
-      LP.toast.success('Lead assigned', agent ? `Assigned to ${agent.name}` : 'Unassigned');
+      
+      btn.disabled = true;
+      btn.textContent = '...';
+
+      try {
+        await LP.api.updateLead(lead.id, { assigned_to: agentId || null });
+        if (agent) {
+          await LP.api.addActivity({ lead_id: lead.id, type: 'assignment', text: `Assigned to ${agent.name}` });
+        } else {
+          await LP.api.addActivity({ lead_id: lead.id, type: 'assignment', text: `Unassigned` });
+        }
+        
+        // Refresh data
+        LP.data.leads = await LP.api.getLeads();
+        const updatedLead = LP.data.leads.find(l => l.id === lead.id);
+        if (updatedLead) {
+          document.getElementById('activity-log').innerHTML = renderActivities(updatedLead.activities);
+          lead.assignedTo = updatedLead.assignedTo;
+        }
+        
+        LP.toast.success('Lead assigned', agent ? `Assigned to ${agent.name}` : 'Unassigned');
+        
+        // Refresh underlying page if it has renderTable
+        const mod = LP.router.pageMap[LP.router.current];
+        if (mod && mod.init) {
+          mod.init(document.getElementById('page-content'));
+        }
+      } catch (err) {
+        LP.toast.warning('Error', 'Failed to assign agent');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Assign';
+      }
     });
 
     // Save note
-    document.getElementById('save-note-btn')?.addEventListener('click', () => {
-      const note = document.getElementById('lead-note')?.value?.trim();
+    document.getElementById('save-note-btn')?.addEventListener('click', async () => {
+      const btn = document.getElementById('save-note-btn');
+      const noteInput = document.getElementById('lead-note');
+      const note = noteInput?.value?.trim();
       if (!note) return;
-      const activity = { type: 'note', text: `Note: "${note}"`, user: 'Agency Owner', ts: new Date().toISOString() };
-      lead.activities.unshift(activity);
-      document.getElementById('activity-log').innerHTML = renderActivities(lead.activities);
-      document.getElementById('lead-note').value = '';
-      LP.toast.success('Note saved', '');
+      
+      btn.disabled = true;
+      btn.textContent = 'Saving...';
+      
+      try {
+        await LP.api.addActivity({ lead_id: lead.id, type: 'note', text: `Note: "${note}"` });
+        
+        // Refresh data
+        LP.data.leads = await LP.api.getLeads();
+        const updatedLead = LP.data.leads.find(l => l.id === lead.id);
+        if (updatedLead) {
+          document.getElementById('activity-log').innerHTML = renderActivities(updatedLead.activities);
+          lead.activities = updatedLead.activities;
+        }
+        
+        noteInput.value = '';
+        LP.toast.success('Note saved', '');
+        
+        // Refresh underlying page
+        const mod = LP.router.pageMap[LP.router.current];
+        if (mod && mod.init) {
+          mod.init(document.getElementById('page-content'));
+        }
+      } catch (err) {
+        LP.toast.warning('Error', 'Failed to save note');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Save Note';
+      }
     });
 
     // Delete (demo only)

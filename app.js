@@ -17,6 +17,7 @@ LP.router = (() => {
     settings:     LP.pages.settings,
     reports:      LP.pages.reports,
     calendar:     LP.pages.calendar,
+    team:         LP.pages.team,
   };
 
   const pageTitles = {
@@ -27,6 +28,7 @@ LP.router = (() => {
     settings:     'Settings',
     reports:      'Reports',
     calendar:     'Calendar',
+    team:         'Team Management',
   };
 
   function navigate(page) {
@@ -103,7 +105,25 @@ LP.api = (() => {
     return res.json();
   }
 
-  return { getLeads, getClients, addManualLead };
+  async function updateLead(id, data) {
+    const res = await fetch('/api/leads', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, ...data })
+    });
+    return res.json();
+  }
+
+  async function addActivity(data) {
+    const res = await fetch('/api/activities', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    return res.json();
+  }
+
+  return { getLeads, getClients, addManualLead, updateLead, addActivity };
 })();
 
 // Global data store loaded from API
